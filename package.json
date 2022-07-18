@@ -6,14 +6,18 @@
   "scripts": {
     "start": "tsc && node dist/index.js",
     "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "format": "prettier --ignore-path .gitignore --write --plugin-search-dir=. ."
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@types/node": "*",
+    "@types/node": "^17.0.38",
+    "eslint": "^8.20.0",
+    "eslint-config-prettier": "^8.5.0",
     "nodemon": "^2.0.19",
+    "prettier": "^2.7.1",
     "ts-node": "^10.9.1",
     "typescript": "^4.7.4"
   },
