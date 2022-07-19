@@ -1,6 +1,19 @@
 type StudentLink = {
   link: string;
   img: string;
+  rarity: number;
+  school: string;
+  playRole: string;
+  position: string;
+  attackType: string;
+  armorType: string;
+  combatClass: string;
+  weaponType: string;
+  bunker: string;
+  urban: string;
+  outdoors: string;
+  indoors: string;
+  releaseDate: string;
 };
 
 type Affinity = {

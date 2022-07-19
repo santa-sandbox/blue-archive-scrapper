@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "type": "module",
   "scripts": {
+    "trace": "tsc --traceResolution",
     "start": "tsc && node dist/index.js",
     "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -13,7 +15,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@types/node": "^17.0.38",
+    "@types/node": "^18.0.6",
     "eslint": "^8.20.0",
     "eslint-config-prettier": "^8.5.0",
     "nodemon": "^2.0.19",
