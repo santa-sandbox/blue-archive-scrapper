@@ -1,6 +1,7 @@
 type StudentLink = {
   link: string;
   img: string;
+  name: string;
   rarity: number;
   school: string;
   playRole: string;

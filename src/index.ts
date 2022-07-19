@@ -1,6 +1,6 @@
 import { promises as fsPromises, createWriteStream, access } from 'fs';
 import { join } from 'path';
-import playwright from 'playwright';
+import { chromium } from 'playwright';
 import https from 'https';
 import { IncomingMessage } from 'http';
 
@@ -28,8 +28,13 @@ const studentListUrl = 'https://bluearchive.wiki/wiki/Characters';
 var studentList = [];
 
 // For write contents into file
-const writeFile = async (filename: string, data: any): Promise<string> => {
+const writeFile = async (
+  filename: string,
+  data: any,
+  rmBeforWrite: boolean = false
+): Promise<string> => {
   try {
+    if (rmBeforWrite) await fsPromises.unlink(join(__dirname, filename));
     await fsPromises.writeFile(join(__dirname, filename), data, { flag: 'a' });
     const contents = await fsPromises.readFile(join(__dirname, filename), 'utf-8');
 
@@ -41,22 +46,61 @@ const writeFile = async (filename: string, data: any): Promise<string> => {
 
 // Drill down into more detail of Students
 const scrapProfile = async (items: Array<StudentLink>) => {
-  const browser = await playwright.chromium.launch();
+  const browser = await chromium.launch();
   const page = await browser.newPage();
+  let count = 0;
 
   for (var item of items) {
+    if (count === 1) break;
     const url = item.link;
     await page.goto(url, { timeout: 60000 });
 
-    const name = await page.$eval('h1#firstHeading', (e) => e.textContent);
-    const baseStar = await page.$eval('div.character-rarity', (e) => e.dataset.value);
     const background = await page.$eval('article#English-1', (e) => {
       let b = e.textContent ? e.textContent : Array.from(e.children).map((e1) => e1.textContent);
       return Array.isArray(b) ? b.join(`\n`) : b;
     });
-    studentList.push(name);
-    console.log(`${name} ${baseStar}⭐`);
+    const equip1 = await page.$eval('td.equipment.equipment-1', (e) => e.dataset.value);
+    const equip2 = await page.$eval('td.equipment.equipment-2', (e) => e.dataset.value);
+    const equip3 = await page.$eval('td.equipment.equipment-3', (e) => e.dataset.value);
+    const fullName = await page.$eval(`td:right-of(:text('Full Name'))`, (e) => e.textContent);
+    const age = await page.$eval(`td:right-of(:text-is('Age'))`, (e) => e.textContent);
+    const birthday = await page.$eval(`td:right-of(:text('Birthday'))`, (e) => e.textContent);
+    const height = await page.$eval(`td:right-of(:text('Height'))`, (e) => e.textContent);
+    const hobbies = await page.$eval(`td:right-of(:text('Hobbies'))`, (e) => e.textContent);
+    const illustrator = await page.$eval(`td:right-of(:text('Illustrator'))`, (e) => e.textContent);
+    const voiceActress = await page.$eval(`td:right-of(:text('Voice'))`, (e) => e.textContent);
+    const student: Student = {
+      name: item.name,
+      rarity: item.rarity,
+      background: background,
+      school: item.school.toUpperCase(),
+      playRole: item.playRole.toUpperCase(),
+      position: item.position.toUpperCase(),
+      attackType: item.attackType.toUpperCase(),
+      armorType: item.armorType.toUpperCase(),
+      combatClass: item.combatClass.toUpperCase(),
+      affinity: {
+        urban: item.urban,
+        outdoors: item.outdoors,
+        indoors: item.indoors
+      },
+      weaponType: item.weaponType,
+      bunker: item.bunker === 'Yes' ? true : false,
+      releaseDate: item.releaseDate
+    };
+    studentList.push(student);
+    console.log(`${student.name} ${student.rarity}⭐`);
     console.log(background);
+    console.log(equip1, equip2, equip3);
+    console.log(fullName);
+    console.log(age);
+    console.log(birthday);
+    console.log(height);
+    console.log(hobbies);
+    console.log(illustrator);
+    console.log(voiceActress);
+
+    count = 1;
   }
 
   await browser.close();
@@ -64,11 +108,11 @@ const scrapProfile = async (items: Array<StudentLink>) => {
 
 // Start scrapping here
 (async () => {
-  const browser = await playwright.chromium.launch();
+  const browser = await chromium.launch();
   const context = await browser.newContext({ acceptDownloads: true });
   const page = await context.newPage();
 
-  console.log(`Find links at ${studentListUrl}`);
+  console.log(`Find links at ${studentListUrl}\n`);
 
   await page.goto(studentListUrl);
   const studentRows = await page.$$eval(
@@ -113,7 +157,7 @@ const scrapProfile = async (items: Array<StudentLink>) => {
     });
   });
 
-  writeFile('./example.json', JSON.stringify(studentRows, null, 2));
+  writeFile('./example.json', JSON.stringify(studentRows, null, 2), true);
 
   console.log(`${studentRows.length} links found`);
 
