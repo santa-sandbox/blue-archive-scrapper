@@ -44,6 +44,12 @@ const writeFile = async (
   }
 };
 
+const findStudentGifts = async (element: HTMLElement | SVGElement): Promise<Array<string>> => {
+  return Array.from(element.children)
+    .filter((e) => e.classList.contains('character-gift'))
+    .map((e) => (e.firstChild.firstChild as HTMLAnchorElement).title);
+};
+
 // Drill down into more detail of Students
 const scrapProfile = async (items: Array<StudentLink>) => {
   const browser = await chromium.launch();
@@ -69,6 +75,55 @@ const scrapProfile = async (items: Array<StudentLink>) => {
     const hobbies = await page.$eval(`td:right-of(:text('Hobbies'))`, (e) => e.textContent);
     const illustrator = await page.$eval(`td:right-of(:text('Illustrator'))`, (e) => e.textContent);
     const voiceActress = await page.$eval(`td:right-of(:text('Voice'))`, (e) => e.textContent);
+    const profileImage = await page.$eval(
+      `//article[@id='Profile_Image-0']/div/div/a/img`,
+      (e) => (e as HTMLImageElement).src
+    );
+    const fullArtwork = await page.$eval(
+      `//article[@id='Full_Artwork-0']/div/div/a/img`,
+      (e) => (e as HTMLImageElement).src
+    );
+    const cafeFurniture = async () => {
+      try {
+        return await page.$eval(
+          `//div[@class='character-cafe-interaction']/div/a`,
+          (e) => (e as HTMLAnchorElement).title
+        );
+      } catch (err) {
+        return null;
+      }
+    };
+    const favoriteGift = async () => {
+      try {
+        return await page.$eval(`p:has-text('Her favorite gift')`, (element) =>
+          Array.from(element.children)
+            .filter((e) => e.classList.contains('character-gift'))
+            .map((e) => (e.firstChild.firstChild as HTMLAnchorElement).title)
+        );
+      } catch (error) {
+        return null;
+      }
+    };
+    const likesGift = async () => {
+      try {
+        return await page.$eval(`p:has-text('also likes')`, (element) =>
+          Array.from(element.children)
+            .filter((e) => e.classList.contains('character-gift'))
+            .map((e) => (e.firstChild.firstChild as HTMLAnchorElement).title)
+        );
+      } catch (error) {
+        return null;
+      }
+    };
+    const uniqueWeaponImg = await page.$eval(
+      `//tr[@class='weapontable-summary']/td/a/img`,
+      (e) => (e as HTMLImageElement).src
+    );
+    const uniqueWeaponName = await page.$$eval(
+      `span.weapon-name-main, span.weapon-name-sub`,
+      (span) => span.map((e) => e.textContent)
+    );
+    const uniqueWeaponDescripton = await page.$eval(`article#English-2`, (e) => e.textContent);
     const student: Student = {
       name: item.name,
       rarity: item.rarity,
@@ -99,8 +154,16 @@ const scrapProfile = async (items: Array<StudentLink>) => {
     console.log(hobbies);
     console.log(illustrator);
     console.log(voiceActress);
+    console.log(profileImage);
+    console.log(fullArtwork);
+    console.log(await cafeFurniture());
+    console.log(await favoriteGift());
+    console.log(await likesGift());
+    console.log(uniqueWeaponImg);
+    console.log(uniqueWeaponName);
+    console.log(uniqueWeaponDescripton);
 
-    count = 1;
+    count = 2;
   }
 
   await browser.close();
