@@ -23,6 +23,28 @@ type Affinity = {
   indoors: string;
 };
 
+type CafeGift = {
+  favorite: Array<string>;
+  likes: Array<string>;
+};
+
+type Cafe = {
+  interact: string | Array<string>;
+  gift: CafeGift;
+};
+
+type StudentImages = {
+  thumbnail: string;
+  profile: string;
+  fullArt: string;
+};
+
+type UniqueWeapon = {
+  name: Array<string>;
+  img: string;
+  description: string;
+};
+
 type Student = {
   name: string;
   rarity: number;
@@ -48,9 +70,9 @@ type Student = {
   voiceActress?: string;
   releaseDate: string;
   stats?: any;
-  bonusAffection?: any;
+  bonusAffection?: Map<number, string>;
   skills?: any;
-  uniqueWeapon?: any;
-  cafeFurniture?: any;
-  gifts?: any;
+  uniqueWeapon?: UniqueWeapon;
+  cafe?: Cafe;
+  images?: StudentImages;
 };

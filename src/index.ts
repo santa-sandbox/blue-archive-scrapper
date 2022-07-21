@@ -3,6 +3,7 @@ import { join } from 'path';
 import { chromium } from 'playwright';
 import https from 'https';
 import { IncomingMessage } from 'http';
+import { isUint16Array } from 'util/types';
 
 // Defined RowIndex (ri) for make query on students list understandable
 const enum ri {
@@ -44,19 +45,13 @@ const writeFile = async (
   }
 };
 
-const findStudentGifts = async (element: HTMLElement | SVGElement): Promise<Array<string>> => {
-  return Array.from(element.children)
-    .filter((e) => e.classList.contains('character-gift'))
-    .map((e) => (e.firstChild.firstChild as HTMLAnchorElement).title);
-};
-
 // Drill down into more detail of Students
 const scrapProfile = async (items: Array<StudentLink>) => {
   const browser = await chromium.launch();
   const page = await browser.newPage();
   let count = 0;
 
-  for (var item of items) {
+  for (let item of items) {
     if (count === 1) break;
     const url = item.link;
     await page.goto(url, { timeout: 60000 });
@@ -82,6 +77,14 @@ const scrapProfile = async (items: Array<StudentLink>) => {
     const fullArtwork = await page.$eval(
       `//article[@id='Full_Artwork-0']/div/div/a/img`,
       (e) => (e as HTMLImageElement).src
+    );
+    const affectionData: Iterable<readonly [number, string]> = await page.$$eval(
+      `//td[@class='affection-data']/div`,
+      (elements) =>
+        elements.map((e) => [
+          parseInt(e.dataset.level),
+          e.dataset.stats + `${e.children.length == 2 ? ' ❤️' : ''}`
+        ])
     );
     const cafeFurniture = async () => {
       try {
@@ -139,29 +142,40 @@ const scrapProfile = async (items: Array<StudentLink>) => {
         outdoors: item.outdoors,
         indoors: item.indoors
       },
+      images: {
+        thumbnail: item.img,
+        profile: profileImage,
+        fullArt: fullArtwork
+      },
+      equip1: equip1,
+      equip2: equip2,
+      equip3: equip3,
+      fullName: fullName,
+      age: age.includes('??') ? -1 : parseInt(age),
+      birthday: birthday,
+      height: parseInt(height.replace('cm', '')),
+      hobbies: hobbies,
+      illustrator: illustrator,
+      voiceActress: voiceActress,
       weaponType: item.weaponType,
       bunker: item.bunker === 'Yes' ? true : false,
-      releaseDate: item.releaseDate
+      releaseDate: item.releaseDate,
+      bonusAffection: new Map(affectionData),
+      cafe: {
+        interact: await cafeFurniture(),
+        gift: {
+          favorite: await favoriteGift(),
+          likes: await likesGift()
+        }
+      },
+      uniqueWeapon: {
+        name: uniqueWeaponName,
+        img: uniqueWeaponImg,
+        description: uniqueWeaponDescripton.trim()
+      }
     };
     studentList.push(student);
-    console.log(`${student.name} ${student.rarity}⭐`);
-    console.log(background);
-    console.log(equip1, equip2, equip3);
-    console.log(fullName);
-    console.log(age);
-    console.log(birthday);
-    console.log(height);
-    console.log(hobbies);
-    console.log(illustrator);
-    console.log(voiceActress);
-    console.log(profileImage);
-    console.log(fullArtwork);
-    console.log(await cafeFurniture());
-    console.log(await favoriteGift());
-    console.log(await likesGift());
-    console.log(uniqueWeaponImg);
-    console.log(uniqueWeaponName);
-    console.log(uniqueWeaponDescripton);
+    console.log(student);
 
     count = 2;
   }
