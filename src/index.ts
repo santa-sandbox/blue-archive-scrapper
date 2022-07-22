@@ -3,10 +3,9 @@ import { join } from 'path';
 import { chromium } from 'playwright';
 import https from 'https';
 import { IncomingMessage } from 'http';
-import { isUint16Array } from 'util/types';
 
-// Defined RowIndex (ri) for make query on students list understandable
-const enum ri {
+// Defined ColumnIndex (ci) for make query on students list understandable
+const enum ci {
   AVATAR,
   NAME,
   RARITY,
@@ -22,6 +21,14 @@ const enum ri {
   OUTDOORS,
   INDOORS,
   RELEASE
+}
+
+// Defined SkillIndex (si) for make query on Skills table
+const enum si {
+  EX,
+  NORMAL,
+  PASSIVE,
+  SUB
 }
 
 // Default URL students list to start scrapping
@@ -45,6 +52,41 @@ const writeFile = async (
   }
 };
 
+// Extracting data from skill table
+const extractSkill = (nodes: Array<SVGElement | HTMLElement>): Ability => {
+  let skillName: string;
+  let iconUrl: string;
+  let levelList: Array<any> = [];
+  let skillCost: number = null;
+  for (let i = 0; i < nodes.length; i++) {
+    if (i == 0) {
+      skillName = nodes[i].children[1].children[2].querySelector('b').textContent;
+      iconUrl = nodes[i].children[1].children[1].children[1].querySelector('img').src;
+    } else if (i == 1) {
+      // nothing: it's header
+    } else {
+      let row = nodes[i].textContent
+        .trim()
+        .split('\n')
+        .filter((t) => t !== '');
+      skillCost = row.length > 2 && skillCost != parseInt(row[1]) ? parseInt(row[1]) : skillCost;
+      const lv: AbilityLevel = {
+        cost: skillCost,
+        level: parseInt(row[0]),
+        description: row[row.length - 1]
+      };
+      levelList.push(lv);
+    }
+  }
+  return { name: skillName, icon: iconUrl, levels: levelList };
+};
+
+// Extracting data from gift in cafe
+const extractGift = (node: SVGElement | HTMLElement) =>
+  Array.from(node.children)
+    .filter((e) => e.classList.contains('character-gift'))
+    .map((e) => (e.firstChild.firstChild as HTMLAnchorElement).title);
+
 // Drill down into more detail of Students
 const scrapProfile = async (items: Array<StudentLink>) => {
   const browser = await chromium.launch();
@@ -56,6 +98,7 @@ const scrapProfile = async (items: Array<StudentLink>) => {
     const url = item.link;
     await page.goto(url, { timeout: 60000 });
 
+    // Scrap detail data of each student
     const background = await page.$eval('article#English-1', (e) => {
       let b = e.textContent ? e.textContent : Array.from(e.children).map((e1) => e1.textContent);
       return Array.isArray(b) ? b.join(`\n`) : b;
@@ -98,22 +141,14 @@ const scrapProfile = async (items: Array<StudentLink>) => {
     };
     const favoriteGift = async () => {
       try {
-        return await page.$eval(`p:has-text('Her favorite gift')`, (element) =>
-          Array.from(element.children)
-            .filter((e) => e.classList.contains('character-gift'))
-            .map((e) => (e.firstChild.firstChild as HTMLAnchorElement).title)
-        );
+        return await page.$eval(`p:has-text('Her favorite gift')`, extractGift);
       } catch (error) {
         return null;
       }
     };
     const likesGift = async () => {
       try {
-        return await page.$eval(`p:has-text('also likes')`, (element) =>
-          Array.from(element.children)
-            .filter((e) => e.classList.contains('character-gift'))
-            .map((e) => (e.firstChild.firstChild as HTMLAnchorElement).title)
-        );
+        return await page.$eval(`p:has-text('also likes')`, extractGift);
       } catch (error) {
         return null;
       }
@@ -127,6 +162,26 @@ const scrapProfile = async (items: Array<StudentLink>) => {
       (span) => span.map((e) => e.textContent)
     );
     const uniqueWeaponDescripton = await page.$eval(`article#English-2`, (e) => e.textContent);
+    // todo: stats
+    // todo: skills
+    const exSkill = await page.$$eval(
+      `//table[contains(@class, 'skilltable')][1]/tbody/tr`,
+      extractSkill
+    );
+    const normalSkill = await page.$$eval(
+      `//table[contains(@class, 'skilltable')][2]/tbody/tr`,
+      extractSkill
+    );
+    const passiveSkill = await page.$$eval(
+      `//table[contains(@class, 'skilltable')][3]/tbody/tr`,
+      extractSkill
+    );
+    const subSkill = await page.$$eval(
+      `//table[contains(@class, 'skilltable')][4]/tbody/tr`,
+      extractSkill
+    );
+
+    // put scrapped data into Student object
     const student: Student = {
       name: item.name,
       rarity: item.rarity,
@@ -172,6 +227,12 @@ const scrapProfile = async (items: Array<StudentLink>) => {
         name: uniqueWeaponName,
         img: uniqueWeaponImg,
         description: uniqueWeaponDescripton.trim()
+      },
+      skills: {
+        ex: exSkill,
+        normal: normalSkill,
+        passive: passiveSkill,
+        sub: subSkill
       }
     };
     studentList.push(student);
@@ -193,27 +254,27 @@ const scrapProfile = async (items: Array<StudentLink>) => {
 
   await page.goto(studentListUrl);
   const studentRows = await page.$$eval(
-    `//table[contains(@class, 'charactertable')]//tbody//tr`,
+    `//table[contains(@class, 'charactertable')]/tbody/tr`,
     (rows) =>
       rows.map((row: HTMLTableRowElement) => {
         const td = row.children;
         return {
-          link: (td[ri.NAME].firstChild as HTMLAnchorElement).href,
-          img: (td[ri.AVATAR].firstChild.firstChild as HTMLImageElement).src,
-          name: td[ri.NAME].firstChild.textContent,
-          rarity: td[ri.RARITY].children.length,
-          school: td[ri.SCHOOL].textContent,
-          playRole: td[ri.ROLE].textContent,
-          position: td[ri.POSITION].textContent,
-          attackType: td[ri.ATTACK].textContent,
-          armorType: td[ri.ARMOR].textContent,
-          combatClass: td[ri.COMBAT].textContent,
-          weaponType: td[ri.WEAPON].textContent,
-          bunker: td[ri.BUNKER].textContent,
-          urban: (td[ri.URBAN].firstChild as HTMLAnchorElement).title.charAt(0),
-          outdoors: (td[ri.OUTDOORS].firstChild as HTMLAnchorElement).title.charAt(0),
-          indoors: (td[ri.INDOORS].firstChild as HTMLAnchorElement).title.charAt(0),
-          releaseDate: td[ri.RELEASE].textContent
+          link: (td[ci.NAME].firstChild as HTMLAnchorElement).href,
+          img: (td[ci.AVATAR].firstChild.firstChild as HTMLImageElement).src,
+          name: td[ci.NAME].firstChild.textContent,
+          rarity: td[ci.RARITY].children.length,
+          school: td[ci.SCHOOL].textContent,
+          playRole: td[ci.ROLE].textContent,
+          position: td[ci.POSITION].textContent,
+          attackType: td[ci.ATTACK].textContent,
+          armorType: td[ci.ARMOR].textContent,
+          combatClass: td[ci.COMBAT].textContent,
+          weaponType: td[ci.WEAPON].textContent,
+          bunker: td[ci.BUNKER].textContent,
+          urban: (td[ci.URBAN].firstChild as HTMLAnchorElement).title.charAt(0),
+          outdoors: (td[ci.OUTDOORS].firstChild as HTMLAnchorElement).title.charAt(0),
+          indoors: (td[ci.INDOORS].firstChild as HTMLAnchorElement).title.charAt(0),
+          releaseDate: td[ci.RELEASE].textContent
         };
       })
   );

@@ -45,6 +45,31 @@ type UniqueWeapon = {
   description: string;
 };
 
+type AbilityLevel = {
+  cost?: number;
+  level: number;
+  description: string;
+  upgrade?: Array<AbilityUpgrade>;
+};
+
+type AbilityUpgrade = {
+  item: string;
+  amount: number;
+};
+
+type Ability = {
+  name: string;
+  icon: string;
+  levels: Array<AbilityLevel>;
+};
+
+type Skill = {
+  ex: Ability;
+  normal: Ability;
+  passive: Ability;
+  sub: Ability;
+};
+
 type Student = {
   name: string;
   rarity: number;
