@@ -56,7 +56,7 @@ const writeFile = async (
 const extractSkill = (nodes: Array<SVGElement | HTMLElement>): Ability => {
   let skillName: string;
   let iconUrl: string;
-  let levelList: Array<any> = [];
+  let levelList: Array<AbilityLevel> = [];
   let skillCost: number = null;
   for (let i = 0; i < nodes.length; i++) {
     if (i == 0) {
@@ -73,12 +73,34 @@ const extractSkill = (nodes: Array<SVGElement | HTMLElement>): Ability => {
       const lv: AbilityLevel = {
         cost: skillCost,
         level: parseInt(row[0]),
-        description: row[row.length - 1]
+        description: row[row.length - 1],
+        upgrade: []
       };
       levelList.push(lv);
     }
   }
+  skillName = skillName != undefined ? skillName : null;
+  iconUrl = iconUrl != undefined ? iconUrl : null;
   return { name: skillName, icon: iconUrl, levels: levelList };
+};
+
+// Extracting data from skill upgrade table
+const extractUpgrade = (nodes: Array<SVGElement | HTMLElement>): Array<Array<AbilityUpgrade>> => {
+  let upgradeList: Array<Array<AbilityUpgrade>> = [];
+  let upgrade: Array<AbilityUpgrade>;
+  let material: string;
+  let matAmount: number;
+  for (const node of nodes) {
+    upgrade = [];
+    for (let i = 1; i < node.children.length; i++) {
+      if (node.children[i].children.length == 0) continue;
+      material = node.children[i].querySelector('a').title;
+      matAmount = parseInt(node.children[i].querySelector('b').textContent.replace(/,/g, ''));
+      upgrade.push({ item: material, amount: matAmount });
+    }
+    upgradeList.push(upgrade);
+  }
+  return upgradeList;
 };
 
 // Extracting data from gift in cafe
@@ -94,7 +116,7 @@ const scrapProfile = async (items: Array<StudentLink>) => {
   let count = 0;
 
   for (let item of items) {
-    if (count === 1) break;
+    if (count === 200) break;
     const url = item.link;
     await page.goto(url, { timeout: 60000 });
 
@@ -163,11 +185,20 @@ const scrapProfile = async (items: Array<StudentLink>) => {
     );
     const uniqueWeaponDescripton = await page.$eval(`article#English-2`, (e) => e.textContent);
     // todo: stats
-    // todo: skills
+    const exUpgrade = await page.$$eval(
+      `//table[contains(@class, 'upgradetable')][1]/tbody/tr[position()>=3]`,
+      extractUpgrade
+    );
     const exSkill = await page.$$eval(
       `//table[contains(@class, 'skilltable')][1]/tbody/tr`,
       extractSkill
     );
+    exSkill.levels.forEach((lv, i) => {
+      lv.upgrade.concat(i == 0 ? [] : exUpgrade[i - 1]);
+      if (i > 0) {
+        lv.upgrade = exUpgrade[i - 1];
+      }
+    });
     const normalSkill = await page.$$eval(
       `//table[contains(@class, 'skilltable')][2]/tbody/tr`,
       extractSkill
@@ -178,6 +209,14 @@ const scrapProfile = async (items: Array<StudentLink>) => {
     );
     const subSkill = await page.$$eval(
       `//table[contains(@class, 'skilltable')][4]/tbody/tr`,
+      extractSkill
+    );
+    const weaponPassiveSkill = await page.$$eval(
+      `//table[contains(@class, 'skilltable')][5]/tbody/tr`,
+      extractSkill
+    );
+    const equipNormalSkill = await page.$$eval(
+      `//table[contains(@class, 'skilltable')][6]/tbody/tr`,
       extractSkill
     );
 
@@ -202,9 +241,9 @@ const scrapProfile = async (items: Array<StudentLink>) => {
         profile: profileImage,
         fullArt: fullArtwork
       },
-      equip1: equip1,
-      equip2: equip2,
-      equip3: equip3,
+      equip1: equip1.toUpperCase(),
+      equip2: equip2.toUpperCase(),
+      equip3: equip3.toUpperCase(),
       fullName: fullName,
       age: age.includes('??') ? -1 : parseInt(age),
       birthday: birthday,
@@ -232,13 +271,15 @@ const scrapProfile = async (items: Array<StudentLink>) => {
         ex: exSkill,
         normal: normalSkill,
         passive: passiveSkill,
-        sub: subSkill
+        sub: subSkill,
+        weaponPassive: weaponPassiveSkill,
+        equipNormal: equipNormalSkill
       }
     };
     studentList.push(student);
     console.log(student);
 
-    count = 2;
+    count = count + 1;
   }
 
   await browser.close();
@@ -282,11 +323,12 @@ const scrapProfile = async (items: Array<StudentLink>) => {
   await fsPromises.mkdir('./dist/thumbnail', { recursive: true });
 
   // download thumbnail of students
+  let existedThumbnail: number = 0;
   studentRows.forEach(async (row) => {
     const filePath = row.img.substring(row.img.lastIndexOf('/') + 1).replace(/%28|%29/g, '');
     access(`./dist/thumbnail/${filePath}`, (error) => {
       if (!error) {
-        console.log(`${filePath} existed`);
+        existedThumbnail++;
       } else {
         const file = createWriteStream(`./dist/thumbnail/${filePath}`);
         file.on('finish', (_: any) => console.log(`${filePath} downloaded`));
@@ -298,6 +340,9 @@ const scrapProfile = async (items: Array<StudentLink>) => {
   writeFile('./example.json', JSON.stringify(studentRows, null, 2), true);
 
   console.log(`${studentRows.length} links found`);
+  if (existedThumbnail > 0) {
+    console.log(`existed thumbnail: ${existedThumbnail}`);
+  }
 
   await browser.close();
 

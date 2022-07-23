@@ -68,6 +68,8 @@ type Skill = {
   normal: Ability;
   passive: Ability;
   sub: Ability;
+  weaponPassive?: Ability;
+  equipNormal?: Ability;
 };
 
 type Student = {
@@ -96,8 +98,9 @@ type Student = {
   releaseDate: string;
   stats?: any;
   bonusAffection?: Map<number, string>;
-  skills?: any;
+  skills?: Skill;
   uniqueWeapon?: UniqueWeapon;
   cafe?: Cafe;
   images?: StudentImages;
+  limited?: boolean;
 };
