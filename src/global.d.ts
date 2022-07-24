@@ -43,6 +43,7 @@ type UniqueWeapon = {
   name: Array<string>;
   img: string;
   description: string;
+  affinityUp: Array<string>;
 };
 
 type AbilityLevel = {
@@ -69,7 +70,7 @@ type Skill = {
   passive: Ability;
   sub: Ability;
   weaponPassive?: Ability;
-  equipNormal?: Ability;
+  gearNormal?: Ability;
 };
 
 type Student = {
@@ -100,6 +101,7 @@ type Student = {
   bonusAffection?: Map<number, string>;
   skills?: Skill;
   uniqueWeapon?: UniqueWeapon;
+  uniqueGear?: any;
   cafe?: Cafe;
   images?: StudentImages;
   limited?: boolean;

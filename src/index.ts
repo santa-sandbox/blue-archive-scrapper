@@ -116,7 +116,7 @@ const scrapProfile = async (items: Array<StudentLink>) => {
   let count = 0;
 
   for (let item of items) {
-    if (count === 200) break;
+    if (count === 5) break;
     const url = item.link;
     await page.goto(url, { timeout: 60000 });
 
@@ -184,6 +184,49 @@ const scrapProfile = async (items: Array<StudentLink>) => {
       (span) => span.map((e) => e.textContent)
     );
     const uniqueWeaponDescripton = await page.$eval(`article#English-2`, (e) => e.textContent);
+    const uniqueWeaponAffinity = await page.$eval(`td:right-of(td > img:nth-of-type(3))`, (e) =>
+      e.textContent
+        .trim()
+        .split('area affinity')
+        .map((s) => s.trim().toUpperCase())
+    );
+    const uniqueGearImg = async () => {
+      try {
+        return await page.$eval(
+          `//tr[@class='geartable-summary']/td/a/img`,
+          (e) => (e as HTMLImageElement).src
+        );
+      } catch (error) {
+        return null;
+      }
+    };
+    const uniqueGearName = async () => {
+      try {
+        return await page.$$eval(`span.gear-name-main, span.gear-name-sub`, (span) =>
+          span.map((e) => e.textContent)
+        );
+      } catch (error) {
+        return null;
+      }
+    };
+    const uniqueGearDescription =
+      (await page.$(`article#English-3`)) != null
+        ? await page.$eval(`article#English-3`, (e) => e.textContent.trim())
+        : null;
+    const uniqueGearTier1 =
+      (await page.$(`table.geartable > tbody > tr > td:right-of(td:text-is('T1'))`)) != null
+        ? await page.$eval(
+            `table.geartable > tbody > tr > td:right-of(td:text-is('T1'))`,
+            (e) => e.textContent
+          )
+        : null;
+    const uniqueGearTier2 =
+      (await page.$(`table.geartable > tbody > tr > td:right-of(td:text-is('T2'))`)) != null
+        ? await page.$eval(
+            `table.geartable > tbody > tr > td:right-of(td:text-is('T2'))`,
+            (e) => e.textContent
+          )
+        : null;
     // todo: stats
     const exUpgrade = await page.$$eval(
       `//table[contains(@class, 'upgradetable')][1]/tbody/tr[position()>=3]`,
@@ -215,10 +258,11 @@ const scrapProfile = async (items: Array<StudentLink>) => {
       `//table[contains(@class, 'skilltable')][5]/tbody/tr`,
       extractSkill
     );
-    const equipNormalSkill = await page.$$eval(
+    const gearNormalSkill = await page.$$eval(
       `//table[contains(@class, 'skilltable')][6]/tbody/tr`,
       extractSkill
     );
+    const isLimited = await page.$(`ul:below(:text('How to Obtain')) >> li:has-text('limited')`);
 
     // put scrapped data into Student object
     const student: Student = {
@@ -265,7 +309,14 @@ const scrapProfile = async (items: Array<StudentLink>) => {
       uniqueWeapon: {
         name: uniqueWeaponName,
         img: uniqueWeaponImg,
-        description: uniqueWeaponDescripton.trim()
+        description: uniqueWeaponDescripton.trim(),
+        affinityUp: uniqueWeaponAffinity
+      },
+      uniqueGear: {
+        name: await uniqueGearName(),
+        img: await uniqueGearImg(),
+        description: uniqueGearDescription,
+        tier: [uniqueGearTier1, uniqueGearTier2]
       },
       skills: {
         ex: exSkill,
@@ -273,8 +324,9 @@ const scrapProfile = async (items: Array<StudentLink>) => {
         passive: passiveSkill,
         sub: subSkill,
         weaponPassive: weaponPassiveSkill,
-        equipNormal: equipNormalSkill
-      }
+        gearNormal: gearNormalSkill
+      },
+      limited: isLimited != null ? true : false
     };
     studentList.push(student);
     console.log(student);
