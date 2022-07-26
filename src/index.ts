@@ -116,7 +116,7 @@ const scrapProfile = async (items: Array<StudentLink>) => {
   let count = 0;
 
   for (let item of items) {
-    if (count === 5) break;
+    if (count === 500) break;
     const url = item.link;
     await page.goto(url, { timeout: 60000 });
 
